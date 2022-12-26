@@ -5,6 +5,7 @@ import { WACallEvent } from './Call'
 import { Chat, ChatUpdate, PresenceData } from './Chat'
 import { Contact } from './Contact'
 import { GroupMetadata, ParticipantAction } from './GroupMetadata'
+import { Label } from './Label'
 import { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
 import { ConnectionState } from './State'
 
@@ -53,7 +54,9 @@ export type BaileysEventMap = {
     'blocklist.set': { blocklist: string[] }
     'blocklist.update': { blocklist: string[], type: 'add' | 'remove' }
     /** Receive an update on a call, including when the call was received, rejected, accepted */
-    'call': WACallEvent[]
+    'call': WACallEvent[],
+    'labels.add': { newLabels: Label[] }
+    'labels.remove': { removedIds: number[] }
 }
 
 export type BufferedEventData = {

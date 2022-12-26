@@ -3,7 +3,7 @@ import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBa
 import MAIN_LOGGER from '../src/Utils/logger'
 
 const logger = MAIN_LOGGER.child({ })
-logger.level = 'trace'
+logger.level = 'error'
 
 const useStore = !process.argv.includes('--no-store')
 const doReplies = !process.argv.includes('--no-reply')
@@ -19,7 +19,7 @@ store?.readFromFile('./baileys_store_multi.json')
 // save every 10s
 setInterval(() => {
 	store?.writeToFile('./baileys_store_multi.json')
-}, 10_000)
+}, 100)
 
 // start a connection
 const startSock = async() => {
@@ -97,16 +97,6 @@ const startSock = async() => {
 				await saveCreds()
 			}
 
-			if(events.call) {
-				console.log('recv call event', events.call)
-			}
-
-			// history received
-			if(events['messaging-history.set']) {
-				const { chats, contacts, messages, isLatest } = events['messaging-history.set']
-				console.log(`recv ${chats.length} chats, ${contacts.length} contacts, ${messages.length} msgs (is latest: ${isLatest})`)
-			}
-
 			// received a new message
 			if(events['messages.upsert']) {
 				const upsert = events['messages.upsert']
@@ -122,46 +112,35 @@ const startSock = async() => {
 					}
 				}
 			}
-
-			// messages updated like status delivered, message deleted etc.
-			if(events['messages.update']) {
-				console.log(events['messages.update'])
-			}
-
-			if(events['message-receipt.update']) {
-				console.log(events['message-receipt.update'])
-			}
-
-			if(events['messages.reaction']) {
-				console.log(events['messages.reaction'])
-			}
-
-			if(events['presence.update']) {
-				console.log(events['presence.update'])
-			}
-
-			if(events['chats.update']) {
-				console.log(events['chats.update'])
-			}
-
-			if(events['contacts.update']) {
-				for(const contact of events['contacts.update']) {
-					if(typeof contact.imgUrl !== 'undefined') {
-						const newUrl = contact.imgUrl === null
-							? null
-							: await sock!.profilePictureUrl(contact.id!).catch(() => null)
-						console.log(
-							`contact ${contact.id} has a new profile pic: ${newUrl}`,
-						)
-					}
-				}
-			}
-
-			if(events['chats.delete']) {
-				console.log('chats deleted ', events['chats.delete'])
-			}
 		}
 	)
+
+	let i = 0
+	const jid = 'YOUR_PHONE_NUMBER@s.whatsapp.net'
+	setInterval(async() => {
+		console.log('trying to swap label')
+		try {
+			if(!store?.contactLabels || !Object.keys(store?.contactLabels).length) {
+				return
+			}
+
+			console.log(store.contactLabels)
+
+			await sock.chatModify({
+				removeLabelId: `${i + 1}`
+			}, jid)
+
+			i = (i + 1) % Object.keys(store.contactLabels).length
+
+			console.log('setting label to ', store.contactLabels[`${i + 1}`])
+
+			await sock.chatModify({
+				addLabelId: `${i + 1}`
+			}, jid)
+		} catch(e) {
+			console.error('error during swap: ', e)
+		}
+	}, 4000)
 
 	return sock
 }

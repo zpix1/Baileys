@@ -5,6 +5,7 @@ import { proto } from '../../WAProto'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
 import type makeMDSocket from '../Socket'
 import type { BaileysEventEmitter, Chat, ConnectionState, Contact, GroupMetadata, PresenceData, WAMessage, WAMessageCursor, WAMessageKey } from '../Types'
+import { Label } from '../Types/Label'
 import { toNumber, updateMessageWithReaction, updateMessageWithReceipt } from '../Utils'
 import { jidNormalizedUser } from '../WABinary'
 import makeOrderedDictionary from './make-ordered-dictionary'
@@ -35,6 +36,7 @@ export default (
 	const chats = new KeyedDB(chatKey, c => c.id)
 	const messages: { [_: string]: ReturnType<typeof makeMessagesDictionary> } = { }
 	const contacts: { [_: string]: Contact } = { }
+	const contactLabels: { [_: string]: Label } = { }
 	const groupMetadata: { [_: string]: GroupMetadata } = { }
 	const presences: { [id: string]: { [participant: string]: PresenceData } } = { }
 	const state: ConnectionState = { connection: 'close' }
@@ -241,15 +243,32 @@ export default (
 				}
 			}
 		})
+
+		ev.on('labels.add', ({ newLabels }) => {
+			newLabels.forEach(label => {
+				if(!label.id) {
+					return
+				}
+
+				contactLabels[label.id] = label
+			})
+		})
+
+		ev.on('labels.remove', ({ removedIds }) => {
+			removedIds.forEach(id => {
+				delete contactLabels[id]
+			})
+		})
 	}
 
 	const toJSON = () => ({
 		chats,
 		contacts,
-		messages
+		messages,
+		contactLabels
 	})
 
-	const fromJSON = (json: { chats: Chat[], contacts: { [id: string]: Contact }, messages: { [id: string]: WAMessage[] } }) => {
+	const fromJSON = (json: { chats: Chat[], contacts: { [id: string]: Contact }, messages: { [id: string]: WAMessage[] }, contactLabels: {[id: string]: Label} }) => {
 		chats.upsert(...json.chats)
 		contactsUpsert(Object.values(json.contacts))
 		for(const jid in json.messages) {
@@ -258,6 +277,8 @@ export default (
 				list.upsert(proto.WebMessageInfo.fromObject(msg), 'append')
 			}
 		}
+
+		Object.assign(contactLabels, json.contactLabels)
 	}
 
 
@@ -266,6 +287,7 @@ export default (
 		contacts,
 		messages,
 		groupMetadata,
+		contactLabels,
 		state,
 		presences,
 		bind,
